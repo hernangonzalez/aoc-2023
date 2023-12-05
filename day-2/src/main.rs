@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use std::cmp::max;
 use std::ops::Add;
 use std::str::FromStr;
 
@@ -9,10 +10,25 @@ fn main() -> Result<()> {
         green: 13,
         blue: 14,
     };
+
     let res = part_1::process(&text, limit);
-    println!("Result: {res}");
+    println!("Part 1: {res}");
+
+    let res = part_2::process(&text);
+    println!("Part 2: {res}");
+
     Ok(())
 }
+
+#[derive(Debug)]
+enum Dice {
+    Red,
+    Green,
+    Blue,
+}
+
+#[derive(Debug)]
+struct DiceRoll(Dice, u32);
 
 #[derive(Default, Debug)]
 struct DiceSet {
@@ -28,16 +44,6 @@ struct Game {
     id: u32,
     set: Vec<DiceSet>,
 }
-
-#[derive(Debug)]
-enum Dice {
-    Red,
-    Green,
-    Blue,
-}
-
-#[derive(Debug)]
-struct DiceRoll(Dice, u32);
 
 mod parse {
     use super::*;
@@ -68,7 +74,7 @@ mod parse {
         type Err = anyhow::Error;
 
         fn from_str(s: &str) -> Result<Self> {
-            let sets = s.split(',').map(|s| s.parse::<DiceRoll>().unwrap());
+            let sets = s.split(',').map(|s| s.parse::<DiceRoll>()).flatten();
             let sum = sets.fold(Self::default(), |acc, x| acc + x);
             Ok(sum)
         }
@@ -109,11 +115,23 @@ impl DiceSet {
     fn contains(&self, other: &DiceSet) -> bool {
         other.red <= self.red && other.green <= self.green && other.blue <= self.blue
     }
+
+    fn power(&self) -> u32 {
+        self.red * self.green * self.blue
+    }
 }
 
 impl Game {
     fn is_valid(&self, limit: &Config) -> bool {
         self.set.iter().all(|s| limit.contains(s))
+    }
+
+    fn min(&self) -> DiceSet {
+        self.set.iter().fold(DiceSet::default(), |acc, n| DiceSet {
+            red: max(n.red, acc.red),
+            green: max(n.green, acc.green),
+            blue: max(n.blue, acc.blue),
+        })
     }
 }
 
@@ -124,9 +142,25 @@ mod part_1 {
         text.lines()
             .map(|l| l.trim())
             .filter(|l| !l.is_empty())
-            .map(|l| l.parse::<Game>().unwrap())
+            .map(|l| l.parse::<Game>())
+            .flatten()
             .filter(|l| l.is_valid(&config))
             .map(|g| g.id)
+            .sum()
+    }
+}
+
+mod part_2 {
+    use crate::Game;
+
+    pub fn process(text: &str) -> u32 {
+        text.lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .map(|l| l.parse::<Game>())
+            .flatten()
+            .map(|g| g.min())
+            .map(|g| g.power())
             .sum()
     }
 }
@@ -144,7 +178,7 @@ mod tests {
     "#;
 
     #[test]
-    fn test_sample_1() {
+    fn test_part_1() {
         let cfg = Config {
             red: 12,
             green: 13,
@@ -152,5 +186,11 @@ mod tests {
         };
         let res = part_1::process(SAMPLE_1, cfg);
         assert_eq!(res, 8)
+    }
+
+    #[test]
+    fn test_part_2() {
+        let res = part_2::process(SAMPLE_1);
+        assert_eq!(res, 2286)
     }
 }
