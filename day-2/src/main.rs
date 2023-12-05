@@ -9,7 +9,7 @@ fn main() -> Result<()> {
         green: 13,
         blue: 14,
     };
-    let res = process(&text, limit);
+    let res = part_1::process(&text, limit);
     println!("Result: {res}");
     Ok(())
 }
@@ -117,21 +117,18 @@ impl Game {
     }
 }
 
-fn process_line(line: &str, config: &Config) -> u32 {
-    let rec = line.parse::<Game>().unwrap();
-    if rec.is_valid(config) {
-        rec.id
-    } else {
-        0
-    }
-}
+mod part_1 {
+    use crate::{Config, Game};
 
-fn process(text: &str, config: Config) -> u32 {
-    text.lines()
-        .map(|l| l.trim())
-        .filter(|l| !l.is_empty())
-        .map(|l| process_line(l, &config))
-        .sum()
+    pub fn process(text: &str, config: Config) -> u32 {
+        text.lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .map(|l| l.parse::<Game>().unwrap())
+            .filter(|l| l.is_valid(&config))
+            .map(|g| g.id)
+            .sum()
+    }
 }
 
 #[cfg(test)]
@@ -153,7 +150,7 @@ mod tests {
             green: 13,
             blue: 14,
         };
-        let res = process(SAMPLE_1, cfg);
+        let res = part_1::process(SAMPLE_1, cfg);
         assert_eq!(res, 8)
     }
 }
