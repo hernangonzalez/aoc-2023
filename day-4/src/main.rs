@@ -4,14 +4,18 @@ use std::str::FromStr;
 fn main() {
     let text = std::fs::read_to_string("input.txt").unwrap();
     let res1 = part_1::process(&text);
+    let res2 = part_2::process(&text);
     println!("Part 1: {res1}");
+    println!("Part 2: {res2}");
 }
 
 #[allow(dead_code)]
+#[derive(Clone, Debug)]
 struct Card {
     id: u32,
     win: Vec<u32>,
     pick: Vec<u32>,
+    copies: u32,
 }
 
 impl FromStr for Card {
@@ -39,7 +43,12 @@ impl FromStr for Card {
         let win = to_numbers(iter.next().context("missing winners")?);
         let pick = to_numbers(iter.next().context("missing picked numbers")?);
 
-        Ok(Self { id, win, pick })
+        Ok(Self {
+            id,
+            win,
+            pick,
+            copies: 1,
+        })
     }
 }
 
@@ -84,9 +93,27 @@ mod part_1 {
     }
 }
 
+mod part_2 {
+    use crate::parse;
+
+    pub fn process(text: &str) -> u32 {
+        let mut cards = parse(text);
+        for (i, matches) in cards.clone().iter().map(|c| c.match_count()).enumerate() {
+            let copies = cards[i].copies;
+            for j in 0..matches {
+                let index = i + j as usize + 1;
+                let card = &mut cards[index];
+                card.copies += copies;
+            }
+        }
+
+        cards.iter().map(|c| c.copies).sum()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::part_1::process;
+    use super::*;
 
     const SAMPLE: &str = r#"
     Card 1: 41 48 83 86 17 | 83 86  6 31 17  9 48 53
@@ -99,7 +126,13 @@ mod tests {
 
     #[test]
     fn test_part_1() {
-        let res = process(SAMPLE);
+        let res = part_1::process(SAMPLE);
         assert_eq!(res, 13);
+    }
+
+    #[test]
+    fn test_part_2() {
+        let res = part_2::process(SAMPLE);
+        assert_eq!(res, 30);
     }
 }
