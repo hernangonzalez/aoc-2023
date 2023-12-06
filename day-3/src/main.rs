@@ -1,10 +1,11 @@
 use core::ops::Range;
-use std::fmt::{Display, Formatter};
 
 fn main() {
     let text = std::fs::read_to_string("input.txt").unwrap();
     let r1 = part_1::process(&text);
+    let r2 = part_2::process(&text);
     println!("Part 1: {r1}");
+    println!("Part 2: {r2}");
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -25,13 +26,16 @@ struct Element<Inner: Clone + Copy> {
     loc: Loc,
 }
 
-impl<T: Clone + Copy + Display> Display for Element<T> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.val)
+type Num = Element<u32>;
+type Symbol = Element<char>;
+
+impl Symbol {
+    fn is_gear(&self) -> bool {
+        self.val == '*'
     }
 }
 
-impl Element<u32> {
+impl Num {
     fn digits(&self) -> usize {
         let mut divisor = 1;
         let mut count = 1;
@@ -51,15 +55,12 @@ impl Element<u32> {
         range
     }
 
-    fn is_around(&self, sym: &Symbol) -> bool {
+    fn is_adyacent(&self, sym: &Symbol) -> bool {
         let range_x = self.range();
         let dy = self.loc.y.abs_diff(sym.loc.y);
         dy <= 1 && range_x.contains(&sym.loc.x)
     }
 }
-
-type Num = Element<u32>;
-type Symbol = Element<char>;
 
 #[derive(Debug)]
 enum Item {
@@ -80,12 +81,6 @@ impl Item {
             Self::Symbol(s) => Some(*s),
             _ => None,
         }
-    }
-}
-
-impl Display for Item {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        todo!()
     }
 }
 
@@ -143,8 +138,29 @@ mod part_1 {
         let items = parse(text);
         let syms = items.iter().filter_map(|e| e.sym());
         let nums = items.iter().filter_map(|e| e.num());
-        nums.filter(|n| syms.clone().any(|s| n.is_around(&s)))
+        nums.filter(|n| syms.clone().any(|s| n.is_adyacent(&s)))
             .map(|n| n.val)
+            .sum()
+    }
+}
+
+mod part_2 {
+    use crate::parse;
+
+    pub fn process(text: &str) -> u32 {
+        let items = parse(text);
+        let nums = items.iter().filter_map(|e| e.num());
+        let gears = items.iter().filter_map(|e| e.sym()).filter(|s| s.is_gear());
+
+        gears
+            .map(|g| {
+                nums.clone()
+                    .filter(|n| n.is_adyacent(&g))
+                    .map(|n| n.val)
+                    .collect::<Vec<_>>()
+            })
+            .filter(|v| v.len() == 2)
+            .map(|v| v.iter().copied().reduce(|l, r| l * r).unwrap_or(0))
             .sum()
     }
 }
@@ -173,16 +189,8 @@ mod tests {
     }
 
     #[test]
-    fn test_part_1_input() {
-        let text = std::fs::read_to_string("input.txt").unwrap();
-        let start = 5;
-        let text = &text[141 * start..141 * (3 + start)];
-
-        let sum = part_1::process(text);
-        let check = (288 + 896 + 469 + 146 + 790 + 194)
-            + (730 + 250 + 359 + 462 + 138 + 49 + 713 + 342 + 604 + 676 + 418)
-            + (274 + 346 + 725 + 541 + 600 + 366);
-
-        assert_eq!(sum, check);
+    fn test_part_2() {
+        let sum = part_2::process(SAMPLE_1);
+        assert_eq!(sum, 467 * 35 + 755 * 598);
     }
 }
