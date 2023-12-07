@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use itertools::Itertools;
 use regex::Regex;
 use std::ops::Range;
 use std::str::FromStr;
@@ -8,12 +9,17 @@ fn main() {
     let text = std::fs::read_to_string("input.txt").unwrap();
     let res1 = part_1::process(&text).unwrap();
     println!("Part 1: {res1}");
+    let res2 = part_2::process(&text).unwrap();
+    println!("Part 2: {res2}");
 }
 
 type ID = u64;
 
 #[derive(Debug)]
-struct Seed(ID);
+enum Seed {
+    Single(ID),
+    Group(Range<ID>),
+}
 
 #[derive(EnumString, Clone, Copy, Debug, PartialEq)]
 #[strum(serialize_all = "lowercase")]
@@ -48,9 +54,9 @@ impl ConversionMaps {
         self.0.iter().find(|m| m.src == cat)
     }
 
-    fn seed_location(&self, s: &Seed) -> ID {
+    fn seed_location(&self, id: ID) -> ID {
         let mut origin = Category::Seed;
-        let mut id = s.0;
+        let mut id = id;
         while let Some(map) = self.map_from(origin) {
             id = map.resolve(id);
             if map.dst == Category::Location {
@@ -59,6 +65,14 @@ impl ConversionMaps {
             origin = map.dst;
         }
         id
+    }
+
+    fn min_seed_location(&self, range: &Range<ID>) -> ID {
+        range
+            .clone()
+            .map(|id| self.seed_location(id))
+            .min()
+            .unwrap()
     }
 }
 
@@ -85,13 +99,44 @@ impl FromStr for Seed {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self> {
-        Ok(Self(s.parse()?))
+        let id = s.parse()?;
+        Ok(Self::Single(id))
     }
 }
 
-fn parse_seeds(line: &str) -> Result<Vec<Seed>> {
-    let ids = line.split(':').last().context("missing ids")?;
-    ids.split_whitespace().map(|s| s.parse::<Seed>()).collect()
+trait SeedParser {
+    fn parse_seeds(&self, line: &str) -> Result<Vec<Seed>>;
+}
+
+struct SingleSeedParser;
+
+impl SeedParser for SingleSeedParser {
+    fn parse_seeds(&self, line: &str) -> Result<Vec<Seed>> {
+        let ids = line.split(':').last().context("missing ids")?;
+        ids.split_whitespace().map(|s| s.parse::<Seed>()).collect()
+    }
+}
+
+struct RangeSeedParser;
+
+impl SeedParser for RangeSeedParser {
+    fn parse_seeds(&self, line: &str) -> Result<Vec<Seed>> {
+        let ids = line.split(':').last().context("missing ids")?;
+        let ids = ids
+            .split_whitespace()
+            .flat_map(|s| s.parse::<ID>())
+            .batching(|it| match it.next() {
+                None => None,
+                Some(x) => match it.next() {
+                    None => None,
+                    Some(y) => Some((x, y)),
+                },
+            });
+        Ok(ids
+            .map(|(id, len)| id..id + len)
+            .map(|r| Seed::Group(r))
+            .collect())
+    }
 }
 
 fn parse_maps<'a>(lines: impl Iterator<Item = &'a str>) -> Result<ConversionMaps> {
@@ -131,10 +176,10 @@ fn parse_maps<'a>(lines: impl Iterator<Item = &'a str>) -> Result<ConversionMaps
     Ok(ConversionMaps(res))
 }
 
-fn parse(text: &str) -> Result<(Vec<Seed>, ConversionMaps)> {
+fn parse(text: &str, parser: impl SeedParser) -> Result<(Vec<Seed>, ConversionMaps)> {
     let mut lines = text.lines().map(|l| l.trim()).filter(|l| !l.is_empty());
     let seeds = lines.next().context("missing seeds")?;
-    let seeds = parse_seeds(seeds)?;
+    let seeds = parser.parse_seeds(seeds)?;
     let maps = parse_maps(lines)?;
     Ok((seeds, maps))
 }
@@ -143,10 +188,31 @@ mod part_1 {
     use super::*;
 
     pub fn process(text: &str) -> Result<ID> {
-        let (seeds, maps) = parse(text)?;
+        let (seeds, maps) = parse(text, SingleSeedParser)?;
         seeds
             .iter()
+            .flat_map(|s| match s {
+                Seed::Single(id) => Some(*id),
+                _ => None,
+            })
             .map(|s| maps.seed_location(s))
+            .min()
+            .context("Could not map locations")
+    }
+}
+
+mod part_2 {
+    use super::*;
+
+    pub fn process(text: &str) -> Result<ID> {
+        let (seeds, maps) = parse(text, RangeSeedParser)?;
+        seeds
+            .iter()
+            .flat_map(|s| match s {
+                Seed::Group(g) => Some(g),
+                _ => None,
+            })
+            .map(|s| maps.min_seed_location(s))
             .min()
             .context("Could not map locations")
     }
@@ -196,5 +262,11 @@ mod tests {
     fn test_part_1() {
         let res = part_1::process(SAMPLE).unwrap();
         assert_eq!(res, 35);
+    }
+
+    #[test]
+    fn test_part_2() {
+        let res = part_2::process(SAMPLE).unwrap();
+        assert_eq!(res, 46);
     }
 }
