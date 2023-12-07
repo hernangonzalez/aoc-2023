@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use itertools::Itertools;
+use rayon::prelude::*;
 use regex::Regex;
 use std::ops::Range;
 use std::str::FromStr;
@@ -70,6 +71,7 @@ impl ConversionMaps {
     fn min_seed_location(&self, range: &Range<ID>) -> ID {
         range
             .clone()
+            .into_par_iter()
             .map(|id| self.seed_location(id))
             .min()
             .unwrap()
