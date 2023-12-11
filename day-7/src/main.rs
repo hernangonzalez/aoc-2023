@@ -1,68 +1,96 @@
 use anyhow::Result;
 use itertools::Itertools;
 use std::cmp::Ordering;
-use std::fmt::{Debug, Formatter};
-use strum::{Display, EnumString};
+use strum::Display;
 
 fn main() {
     let text = std::fs::read_to_string("input.txt").unwrap();
-    let res1 = part_1::process(&text);
-    println!("Part 1: {res1}");
+    let res = process(&text);
+
+    #[cfg(not(feature = "joker"))]
+    println!("Part 1: {res}");
+
+    #[cfg(feature = "joker")]
+    println!("Part 2: {res}");
 }
 
-#[derive(EnumString, Display, Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
-enum Card {
-    A = 14,
-    K = 13,
-    Q = 12,
-    J = 11,
-    T = 10,
-    #[strum(serialize = "9")]
-    N9 = 9,
-    #[strum(serialize = "8")]
-    N8 = 8,
-    #[strum(serialize = "7")]
-    N7 = 7,
-    #[strum(serialize = "6")]
-    N6 = 6,
-    #[strum(serialize = "5")]
-    N5 = 5,
-    #[strum(serialize = "4")]
-    N4 = 4,
-    #[strum(serialize = "3")]
-    N3 = 3,
-    #[strum(serialize = "2")]
-    N2 = 2,
+#[cfg(feature = "joker")]
+const CARD_ORDER: &str = "AKQT98765432J";
+
+#[cfg(not(feature = "joker"))]
+const CARD_ORDER: &str = "AKQJT98765432";
+
+#[cfg(feature = "joker")]
+const JOKER: Card = Card('J');
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+struct Card(char);
+
+impl Card {
+    fn order(&self) -> usize {
+        CARD_ORDER.find(self.0).expect("Not a legal card")
+    }
+
+    #[cfg(feature = "joker")]
+    fn is_joker(&self) -> bool {
+        *self == JOKER
+    }
+}
+
+impl PartialOrd<Self> for Card {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Card {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.order().cmp(&other.order())
+    }
 }
 
 #[derive(Copy, Clone, Display, Debug, Eq, PartialEq, Ord, PartialOrd)]
 enum Kind {
-    Five = 0,
-    Four = 1,
-    Full = 2,
-    Three = 3,
-    TwoPair = 4,
-    Pair = 5,
-    High = 6,
+    Five,
+    Four,
+    Full,
+    Three,
+    TwoPair,
+    Pair,
+    High,
 }
 
 impl Kind {
     fn build(cards: &[Card; 5]) -> Self {
         let groups = cards.iter().sorted().rev().copied().group_by(|c| *c);
-        let groups = groups
+        let mut groups = groups
             .into_iter()
-            .map(|(k, g)| (k, g.collect_vec()))
-            .sorted_by(|lhs, rhs| rhs.1.len().cmp(&lhs.1.len()))
+            .map(|(k, g)| (k, g.count()))
+            .sorted_by(|lhs, rhs| rhs.1.cmp(&lhs.1))
             .collect_vec();
 
-        match groups[0].1.len() {
+        #[cfg(feature = "joker")]
+        if groups.len() > 1 {
+            let find = groups
+                .iter()
+                .enumerate()
+                .find(|(_, g)| g.0.is_joker())
+                .map(|(i, g)| (i, g.1));
+
+            if let Some((i, count)) = find {
+                groups.remove(i);
+                groups[0].1 += count;
+            }
+        }
+
+        match groups[0].1 {
             5 => Kind::Five,
             4 => Kind::Four,
             3 => match groups.len() {
                 2 => Kind::Full,
                 _ => Kind::Three,
             },
-            2 => match groups[1].1.len() {
+            2 => match groups[1].1 {
                 2 => Kind::TwoPair,
                 _ => Kind::Pair,
             },
@@ -71,16 +99,8 @@ impl Kind {
     }
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 struct Hand(Kind, [Card; 5]);
-
-impl Debug for Hand {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let cards = self.1.map(|c| c.to_string()).join("");
-        let s = format!("{} - {}", &self.0.to_string(), &cards);
-        f.write_str(&s.to_string())
-    }
-}
 
 impl PartialOrd<Self> for Hand {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -98,7 +118,7 @@ impl Ord for Hand {
         self.1
             .iter()
             .enumerate()
-            .map(|(i, c)| c.cmp(&other.1[i]).reverse())
+            .map(|(i, c)| c.cmp(&other.1[i]))
             .find(|o| *o != Ordering::Equal)
             .unwrap_or(Ordering::Equal)
     }
@@ -119,11 +139,12 @@ mod parse {
         type Err = anyhow::Error;
         fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
             anyhow::ensure!(s.len() == 5);
-            let mut coll = [Card::A; 5];
-            for i in 0..s.len() {
-                let char = &s[i..i + 1];
-                coll[i] = char.parse()?;
-            }
+            let coll: [Card; 5] = s
+                .chars()
+                .map(Card)
+                .collect_vec()
+                .try_into()
+                .expect("5 cards");
             let kind = Kind::build(&coll);
             Ok(Self(kind, coll))
         }
@@ -151,21 +172,16 @@ mod parse {
     }
 }
 
-mod part_1 {
-    use crate::parse;
-    use itertools::Itertools;
-
-    pub fn process(text: &str) -> usize {
-        let games = parse::games(text).unwrap();
-        games
-            .0
-            .iter()
-            .sorted()
-            .rev()
-            .enumerate()
-            .map(|(i, g)| (i + 1) * g.1)
-            .sum()
-    }
+fn process(text: &str) -> usize {
+    let games = parse::games(text).unwrap();
+    games
+        .0
+        .iter()
+        .sorted()
+        .rev()
+        .enumerate()
+        .map(|(i, g)| (i + 1) * g.1)
+        .sum()
 }
 
 #[cfg(test)]
@@ -181,8 +197,8 @@ mod tests {
     "#;
 
     #[test]
-    fn test_part_1() {
-        let res = part_1::process(SAMPLE);
-        assert_eq!(res, 6440);
+    fn test_part_2() {
+        let res = process(SAMPLE);
+        assert_eq!(res, 5905);
     }
 }
