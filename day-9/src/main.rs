@@ -5,13 +5,15 @@ fn main() -> Result<()> {
     let text = std::fs::read_to_string("input.txt")?;
     let res = part_1::process(&text);
     println!("Part 1: {res}");
+    let res = part_2::process(&text);
+    println!("Part 2: {res}");
     Ok(())
 }
 
 struct Sequence(Vec<i64>);
 
 impl Sequence {
-    fn next(&self) -> i64 {
+    fn grid(&self) -> Vec<Vec<i64>> {
         let mut grid = Vec::new();
         grid.push(self.0.clone());
 
@@ -29,7 +31,21 @@ impl Sequence {
             vec = grid.last().unwrap();
         }
 
-        grid.iter().flat_map(|v| v.last()).copied().sum()
+        grid
+    }
+
+    fn next(&self) -> i64 {
+        self.grid().iter().flat_map(|v| v.last()).sum()
+    }
+
+    fn prev(&self) -> i64 {
+        self.grid()
+            .iter()
+            .flat_map(|v| v.first())
+            .copied()
+            .rev()
+            .reduce(|acc, i| i - acc)
+            .unwrap()
     }
 }
 
@@ -45,18 +61,29 @@ mod parse {
             )
         }
     }
+
+    pub fn sequence(text: &str) -> Vec<Sequence> {
+        text.lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .map(|l| Sequence::from(l))
+            .collect()
+    }
 }
 
 mod part_1 {
     use super::*;
 
     pub fn process(text: &str) -> i64 {
-        text.lines()
-            .map(|l| l.trim())
-            .filter(|l| !l.is_empty())
-            .map(|l| Sequence::from(l))
-            .map(|s| s.next())
-            .sum()
+        parse::sequence(text).iter().map(|s| s.next()).sum()
+    }
+}
+
+mod part_2 {
+    use super::*;
+
+    pub fn process(text: &str) -> i64 {
+        parse::sequence(text).iter().map(|s| s.prev()).sum()
     }
 }
 
@@ -74,5 +101,11 @@ mod tests {
     fn test_part_1() {
         let res = part_1::process(SAMPLE);
         assert_eq!(res, 114);
+    }
+
+    #[test]
+    fn test_part_2() {
+        let res = part_2::process(SAMPLE);
+        assert_eq!(res, 2)
     }
 }
