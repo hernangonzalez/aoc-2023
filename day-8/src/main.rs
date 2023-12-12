@@ -1,10 +1,15 @@
 use anyhow::{Context, Result};
+use num::integer;
+use rayon::prelude::*;
 use std::collections::HashMap;
 
 fn main() {
     let text = std::fs::read_to_string("input.txt").unwrap();
     let res = part_1::process(&text);
     println!("Part 1: {res}");
+
+    let res = part_2::process(&text);
+    println!("Part 2: {res}");
 }
 
 #[derive(Debug)]
@@ -22,12 +27,29 @@ struct Key(String);
 #[derive(Clone, Debug)]
 struct Instruction(Key, Key);
 
+impl Instruction {
+    fn next(&self, d: &Direction) -> &Key {
+        match d {
+            Direction::Left => &self.0,
+            Direction::Right => &self.1,
+        }
+    }
+}
+
 #[derive(Debug)]
 struct Instructions(HashMap<Key, Instruction>);
 
 impl<'a> Instructions {
     fn path(&'a self, key: &Key) -> Option<&'a Instruction> {
         self.0.get(key)
+    }
+
+    fn paths_ending(&'a self, key: char) -> Vec<Instruction> {
+        self.0
+            .iter()
+            .filter_map(|(k, v)| if k.0.ends_with(key) { Some(v) } else { None })
+            .cloned()
+            .collect::<Vec<_>>()
     }
 }
 
@@ -38,25 +60,42 @@ struct Map {
 }
 
 impl Map {
-    fn route(&self, start: Key, end: Key) -> Result<Vec<Instruction>> {
+    fn navigate(&self, start: Key, end: Key) -> Result<u64> {
+        let is_at_end = |k: &Key| -> bool { *k == end };
+        let start = self.inst.path(&start).context("first instruction")?;
+        self.navigate_end_count(start, &is_at_end)
+    }
+
+    fn navigate_end_count<F>(&self, start: &Instruction, eval: &F) -> Result<u64>
+    where
+        F: FnOnce(&Key) -> bool + Copy,
+    {
         let mut dirs = self.dir.0.iter().cycle();
-        anyhow::ensure!(start != end);
-
-        let mut vec = Vec::new();
-        let mut pivot = &start;
-        while let Some(path) = self.inst.path(&pivot) {
-            pivot = match dirs.next().context("next direction")? {
-                Direction::Left => &path.0,
-                Direction::Right => &path.1,
-            };
-
-            vec.push((*path).clone());
-            if *pivot == end {
+        let mut count = 0;
+        let mut curr = start;
+        loop {
+            let d = dirs.next().context("next direction")?;
+            let n = curr.next(d);
+            curr = self.inst.path(n).context("next path")?;
+            count += 1;
+            if eval(n) {
                 break;
-            }
+            };
         }
+        Ok(count)
+    }
 
-        Ok(vec)
+    fn navigate_ends(&self, start: char, end: char) -> Result<u64> {
+        let is_at_end = |k: &Key| -> bool { k.0.ends_with(end) };
+        let routes = self.inst.paths_ending(start);
+
+        let counts = routes
+            .par_iter()
+            .flat_map(|i| self.navigate_end_count(i, &is_at_end));
+
+        counts
+            .reduce_with(|acc, i| integer::lcm(acc, i))
+            .context("")
     }
 }
 
@@ -66,7 +105,8 @@ mod parse {
     use regex::Regex;
     use std::str::FromStr;
 
-    const INSTRUCTION_REGEX: &str = r"(?<key>[A-Z]+) = \((?<left>[A-Z]+), (?<right>[A-Z]+)\)";
+    const INSTRUCTION_REGEX: &str =
+        r"(?<key>[A-Z0-9]+) = \((?<left>[A-Z0-9]+), (?<right>[A-Z0-9]+)\)";
 
     impl TryFrom<char> for Direction {
         type Error = anyhow::Error;
@@ -127,13 +167,21 @@ mod parse {
 mod part_1 {
     use crate::{Key, Map};
 
-    pub fn process(s: &str) -> usize {
+    pub fn process(s: &str) -> u64 {
         let lines = s.lines().map(|l| l.trim()).filter(|l| !l.is_empty());
         let map = Map::build(lines).expect("map");
-        let path = map
-            .route(Key("AAA".to_string()), Key("ZZZ".to_string()))
-            .expect("path from AAA to ZZZ");
-        path.len()
+        map.navigate(Key("AAA".to_string()), Key("ZZZ".to_string()))
+            .expect("path from AAA to ZZZ")
+    }
+}
+
+mod part_2 {
+    use crate::Map;
+
+    pub fn process(s: &str) -> u64 {
+        let lines = s.lines().map(|l| l.trim()).filter(|l| !l.is_empty());
+        let map = Map::build(lines).expect("map");
+        map.navigate_ends('A', 'Z').expect("path from AAA to ZZZ")
     }
 }
 
@@ -153,12 +201,25 @@ mod tests {
     ZZZ = (ZZZ, ZZZ)
     "#;
 
-    const SAMPLE_2: &str = r#"
+    const SAMPLE_1_2: &str = r#"
     LLR
 
     AAA = (BBB, BBB)
     BBB = (AAA, ZZZ)
     ZZZ = (ZZZ, ZZZ)
+    "#;
+
+    const SAMPLE_2_1: &str = r#"
+    LR
+    
+    11A = (11B, XXX)
+    11B = (XXX, 11Z)
+    11Z = (11B, XXX)
+    22A = (22B, XXX)
+    22B = (22C, 22C)
+    22C = (22Z, 22Z)
+    22Z = (22B, 22B)
+    XXX = (XXX, XXX)    
     "#;
 
     #[test]
@@ -169,7 +230,13 @@ mod tests {
 
     #[test]
     fn test_part_1_sample_2() {
-        let res = part_1::process(SAMPLE_2);
+        let res = part_1::process(SAMPLE_1_2);
+        assert_eq!(res, 6);
+    }
+
+    #[test]
+    fn test_part_2_sample_1() {
+        let res = part_2::process(SAMPLE_2_1);
         assert_eq!(res, 6);
     }
 }
