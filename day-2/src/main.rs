@@ -4,7 +4,7 @@ use std::ops::Add;
 use std::str::FromStr;
 
 fn main() -> Result<()> {
-    let text = std::fs::read_to_string("input.txt")?;
+    let text = std::fs::read_to_string("day-2/input.txt")?;
     let limit = Config {
         red: 12,
         green: 13,

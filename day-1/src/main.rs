@@ -1,13 +1,15 @@
-const NUMS_ENG: [&str; 10] = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+const NUMS_ENG: [&str; 10] = [
+    "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+];
 
 fn main() {
-    let text = std::fs::read_to_string("input.txt").unwrap();
+    let text = std::fs::read_to_string("day-1/input.txt").unwrap();
     let sum = process(&text);
     println!("Answer: {sum}");
 }
 
 struct AocDigit<'a> {
-    inner: &'a str
+    inner: &'a str,
 }
 
 impl<'a> Iterator for AocDigit<'a> {
@@ -28,7 +30,7 @@ impl<'a> Iterator for AocDigit<'a> {
 
             for (i, w) in NUMS_ENG.iter().enumerate() {
                 if sub.starts_with(w) {
-                    return Some(i as u32)
+                    return Some(i as u32);
                 }
             }
         }
@@ -49,9 +51,9 @@ fn process_line(line: &str) -> u32 {
 fn process(text: &str) -> u32 {
     text.lines()
         .filter(|l| l.is_ascii())
-        .map(|l|l.trim().to_lowercase())
+        .map(|l| l.trim().to_lowercase())
         .filter(|l| !l.is_empty())
-        .map(|l| process_line(&l) )
+        .map(|l| process_line(&l))
         .sum()
 }
 

@@ -1,7 +1,7 @@
 use core::ops::Range;
 
 fn main() {
-    let text = std::fs::read_to_string("input.txt").unwrap();
+    let text = std::fs::read_to_string("day-3/input.txt").unwrap();
     let r1 = part_1::process(&text);
     let r2 = part_2::process(&text);
     println!("Part 1: {r1}");

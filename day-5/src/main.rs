@@ -7,7 +7,7 @@ use std::str::FromStr;
 use strum::EnumString;
 
 fn main() {
-    let text = std::fs::read_to_string("input.txt").unwrap();
+    let text = std::fs::read_to_string("day-5/input.txt").unwrap();
     let res1 = part_1::process(&text).unwrap();
     println!("Part 1: {res1}");
     let res2 = part_2::process(&text).unwrap();

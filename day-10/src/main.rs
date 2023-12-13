@@ -42,7 +42,7 @@ struct Trail<'a> {
 #[derive(Debug)]
 struct Walker<'a> {
     map: &'a TileMap,
-    trails: Vec<Trail<'a>>,
+    trail: Trail<'a>,
 }
 
 impl Location {
@@ -157,23 +157,18 @@ impl<'a> Walker<'a> {
     fn new(map: &'a TileMap, start: &'a Tile) -> Walker<'a> {
         Self {
             map,
-            trails: vec![Trail::new(map, start)],
+            trail: Trail::new(map, start),
         }
     }
 
-    fn is_dry(&self) -> bool {
-        self.trails.is_empty()
-    }
-
-    fn reached(&self, t: &Tile) -> Option<&'a Trail> {
-        self.trails.iter().find(|trail| trail.reached(t))
+    fn reached(&self, t: &Tile) -> bool {
+        self.trail.reached(t) && self.trail.count() > 1
     }
 
     fn advance(&self) -> Walker<'a> {
-        let trails = self.trails.iter().flat_map(|t| t.advance()).collect();
         Self {
             map: self.map,
-            trails,
+            trail: self.trail.advance().first().expect("trail").clone(),
         }
     }
 }
@@ -207,14 +202,15 @@ mod part_1 {
         let tiles = TileMap::from(s);
         let start = tiles.find(START_TILE_ID).expect("Start tile 'S'");
 
-        let mut walker = Walker::new(&tiles, &start);
-        let mut trail: Option<usize> = None;
-        while trail.is_none() && !walker.is_dry() {
+        let mut walker = Walker::new(&tiles, &start).advance();
+        loop {
             walker = walker.advance();
-            trail = walker.reached(start).map(|t| t.count());
+            if walker.reached(start) {
+                break;
+            }
         }
 
-        trail.unwrap_or(0) / 2
+        walker.trail.count() / 2
     }
 }
 

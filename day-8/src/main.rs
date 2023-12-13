@@ -4,7 +4,7 @@ use rayon::prelude::*;
 use std::collections::HashMap;
 
 fn main() {
-    let text = std::fs::read_to_string("input.txt").unwrap();
+    let text = std::fs::read_to_string("day-8/input.txt").unwrap();
     let res = part_1::process(&text);
     println!("Part 1: {res}");
 

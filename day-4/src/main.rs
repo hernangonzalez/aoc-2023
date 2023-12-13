@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use std::str::FromStr;
 
 fn main() {
-    let text = std::fs::read_to_string("input.txt").unwrap();
+    let text = std::fs::read_to_string("day-4/input.txt").unwrap();
     let res1 = part_1::process(&text);
     let res2 = part_2::process(&text);
     println!("Part 1: {res1}");

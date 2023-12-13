@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 use strum::Display;
 
 fn main() {
-    let text = std::fs::read_to_string("input.txt").unwrap();
+    let text = std::fs::read_to_string("day-7/input.txt").unwrap();
     let res = process(&text);
 
     #[cfg(not(feature = "joker"))]

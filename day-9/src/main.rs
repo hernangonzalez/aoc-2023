@@ -2,7 +2,7 @@ use color_eyre::Result;
 
 fn main() -> Result<()> {
     color_eyre::install()?;
-    let text = std::fs::read_to_string("input.txt")?;
+    let text = std::fs::read_to_string("day-9/input.txt")?;
     let res = part_1::process(&text);
     println!("Part 1: {res}");
     let res = part_2::process(&text);
